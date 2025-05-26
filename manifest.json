@@ -1,0 +1,20 @@
+{
+    "manifest_version": 3,
+    "name": "DOM Alert Extension",
+    "version": "1.0.0",
+    "description": "Notifies when a specific DOM element changes on the target website",
+    "permissions": ["notifications", "scripting"],
+    "host_permissions": ["https://studybay.com/*"],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "content_scripts": [
+        {
+            "matches": ["https://studybay.com/home/*"],
+            "js": ["content.js"]
+        }
+    ],
+    "action": {
+        "default_title": "DOM Watcher Active"
+    }
+}
