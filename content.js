@@ -15,7 +15,7 @@ if(target) {
         const newValue = target.innerText;
         if(newValue !== lastValue) {
             lastValue = newValue;
-            notifyChange()
+            notifyChange(newValue); // Pass the new value as text
         }
     });
 
