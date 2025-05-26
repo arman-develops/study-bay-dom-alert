@@ -1,5 +1,5 @@
 // const targetSelector = ".messages__left-wraper";
-const targetSelector = ".messages";
+const targetSelector = ".messages-wraper";
 const target = document.querySelector(targetSelector);
 let observer;
 
