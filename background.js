@@ -5,7 +5,7 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
             {
                 type: "basic",
                 iconUrl: "./icon.png",
-                title: "DOM Changed", // Add title (required)
+                title: "NEW MESSAGE ALERT",
                 message: message.text || "New Offer Accepted"
             }
         );

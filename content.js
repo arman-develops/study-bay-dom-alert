@@ -53,11 +53,16 @@ if(target) {
         const newValue = target.innerText;
         if(newValue !== lastValue) {
             lastValue = newValue;
-            notifyChange("Got an Offer or Client Responded, check it out");
+            notifyChange("Got an Offer or A Client Responded, check it out");
         }
     });
 
-    observer.observe(target, {childList: true, subtree: true, characterData: true});
+    observer.observe(target, {
+        childList: true, 
+        subtree: true, 
+        characterData: true,
+        attributes: true
+    });
 } else {
     console.warn(`Target ${targetSelector} not found`);
 }
