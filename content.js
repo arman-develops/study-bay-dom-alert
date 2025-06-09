@@ -1,5 +1,5 @@
 // const targetSelector = ".messages__left-wraper";
-const targetSelector = ".messages-wraper";
+const targetSelector = ".messages__left";
 const target = document.querySelector(targetSelector);
 let observer;
 let pageRefreshObserver;
@@ -18,12 +18,52 @@ function isExtensionValid() {
     }
 }
 
+let audioContext = null;
+let audioEnabled = false;
+
+function initializeAudio() {
+    // Try to enable audio after user interaction
+    const enableAudio = () => {
+        try {
+            const audio = new Audio(chrome.runtime.getURL("sound-notification.mp3"));
+            audio.volume = 0.1; // Very quiet test
+            audio.play().then(() => {
+                audioEnabled = true;
+                console.log("Audio notifications enabled");
+                // Remove the listeners once audio is enabled
+                document.removeEventListener('click', enableAudio);
+                document.removeEventListener('keydown', enableAudio);
+                document.removeEventListener('scroll', enableAudio);
+            }).catch(() => {
+                console.log("Audio still not allowed, will try visual notifications only");
+            });
+        } catch(e) {
+            console.log("Audio setup failed, using visual notifications only");
+        }
+    };
+    
+    // Set up listeners for user interaction
+    document.addEventListener('click', enableAudio, { once: true });
+    document.addEventListener('keydown', enableAudio, { once: true });
+    document.addEventListener('scroll', enableAudio, { once: true });
+}
+
 function playSoundNotification() {
+    if (!audioEnabled) {
+        console.log("Audio not enabled yet - notification sent visually");
+        return;
+    }
+    
     try {
         const audio = new Audio(chrome.runtime.getURL("sound-notification.mp3"));
-        audio.play();
+        audio.volume = 0.5; // Adjust volume as needed
+        audio.play().catch(e => {
+            console.warn("Could not play sound: ", e);
+            audioEnabled = false; // Reset if it fails
+        });
     } catch(e) {
         console.warn("Could not play sound: ", e);
+        audioEnabled = false;
     }
 }
 
@@ -56,7 +96,7 @@ function notifyChange(text, isRefresh = false) {
     }
 }
 
-function getMessageCount() {
+function getMessageCounts() {
     const auctionItems = target?.querySelectorAll('.messages__left_item[data-stage="Auction"]') || []
     return {
         auction: auctionItems.length,
@@ -66,14 +106,18 @@ function getMessageCount() {
 
 // Check for unread message indicators on Auction items only
 function getUnreadCounts() {
-    const unreadElements = target?.querySelectorAll('.messages__left_item[data-stage="Auction"] #unreadMessageCnt_*') || [];
+    const auctionItems = target?.querySelectorAll('.messages__left_item[data-stage="Auction"]') || [];
     let totalUnread = 0;
     
-    unreadElements.forEach(el => {
-        const text = el.textContent.trim();
-        const match = text.match(/\+(\d+)/);
-        if (match) {
-            totalUnread += parseInt(match[1]);
+    auctionItems.forEach(item => {
+        // Look for unread count elements within each auction item
+        const unreadElement = item.querySelector('[id^="unreadMessageCnt_"]');
+        if (unreadElement) {
+            const text = unreadElement.textContent.trim();
+            const match = text.match(/\+(\d+)/);
+            if (match) {
+                totalUnread += parseInt(match[1]);
+            }
         }
     });
     
@@ -163,6 +207,9 @@ function setupRefreshDetection() {
 }
 
 if(target) {
+    //initialize audio
+    initializeAudio();
+
     // Initialize tracking - auction only
     const initialCounts = getMessageCounts();
     lastKnownCounts = {
