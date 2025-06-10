@@ -59,7 +59,7 @@ function playSoundNotification() {
     }
     
     try {
-        const audio = new Audio(chrome.runtime.getURL("sound-notification.mp3"));
+        const audio = new Audio(chrome.runtime.getURL("sound-notification.wav"));
         audio.volume = 0.5; // Adjust volume as needed
         audio.play().catch(e => {
             console.warn("Could not play sound: ", e);
@@ -95,9 +95,9 @@ function notifyChange(text, isRefresh = false) {
             pageRefreshObserver.disconnect();
         }
     });
-    if(!isRefresh) {
-        playSoundNotification();
-    }
+    
+    playSoundNotification();
+    
 }
 
 // get all order numbers from auction items
