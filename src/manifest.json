@@ -3,7 +3,11 @@
     "name": "DOM Alert Extension",
     "version": "1.0.0",
     "description": "Notifies when a specific DOM element changes on the target website",
-    "permissions": ["notifications", "scripting"],
+    "permissions": [
+        "notifications", 
+        "scripting",
+        "storage"
+    ],
     "web_accessible_resources": [
         {
             "resources": ["sound-notification.mp3"],

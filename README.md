@@ -1,4 +1,4 @@
-# Order & Online Status Monitor
+# Study Bay Order & Online Status Monitor
 
 A Chrome extension content script that monitors auction orders and customer online status in real-time, providing instant notifications for new opportunities and customer engagement.
 
@@ -26,7 +26,7 @@ A Chrome extension content script that monitors auction orders and customer onli
 
 - Chrome Extension with appropriate permissions
 - Target page with `.messages__left` container
-- Audio file: `sound-notification.mp3` (optional)
+- Audio file: `sound-notification.wav` (optional)
 
 ## 🛠️ Installation
 
@@ -36,7 +36,7 @@ A Chrome extension content script that monitors auction orders and customer onli
    "content_scripts": [
      {
        "matches": ["https://your-target-site.com/*"],
-       "js": ["order-monitor.js"]
+       "js": ["content.js"]
      }
    ]
    ```
@@ -55,7 +55,7 @@ A Chrome extension content script that monitors auction orders and customer onli
    ```
 
 3. **Optional Audio Setup**:
-   - Add `sound-notification.mp3` to your extension directory
+   - Add `sound-notification.wav` to your extension directory
    - Include in `web_accessible_resources` in manifest.json
 
 ## 🎯 How It Works
@@ -107,9 +107,9 @@ const auctionKeywords = ['auction', 'bid', 'offer', 'proposal', 'quote', 'deadli
 The script monitors elements with these attributes:
 ```html
 <div class="messages__left_item" 
-     data-id="3810112"
-     data-title="Unit: Employment Law"
-     data-cutomer_nick_name="Asmauser3532631"
+     data-id="######"
+     data-title="<Title>"
+     data-cutomer_nick_name="<some user>"
      data-stage="Auction"
      data-online="online">
 </div>
@@ -156,7 +156,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     "js": ["order-monitor.js"]
   }],
   "web_accessible_resources": [{
-    "resources": ["sound-notification.mp3"],
+    "resources": ["sound-notification.wav"],
     "matches": ["https://your-site.com/*"]
   }]
 }
@@ -174,7 +174,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 **Audio Not Playing**
 - Audio requires user interaction to enable
 - Click, scroll, or press a key on the page to activate
-- Check if `sound-notification.mp3` is accessible
+- Check if `sound-notification.wav` is accessible
 
 **Missing Orders After Refresh**
 - Check if sessionStorage is working properly
