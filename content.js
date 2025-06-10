@@ -10,6 +10,10 @@ let lastFullContent = ""
 let isTyping = false;
 let typingTimeout;
 
+//order number tracking
+let lastKnownOrderNumbers = new Set();
+let lastKnownOnlineUsers = new Set();
+
 function isExtensionValid() {
     try {
         return chrome.runtime && chrome.runtime.id;
@@ -80,7 +84,7 @@ function notifyChange(text, isRefresh = false) {
     }
     
     chrome.runtime.sendMessage({
-        type: isRefresh ? "PAGE_REFRESHED" : "DOM_CHANGED",
+        type: "DOM_CHANGED",
         text: text
     }).catch(error => {
         console.warn("Failed to send message:", error);
@@ -94,6 +98,93 @@ function notifyChange(text, isRefresh = false) {
     if(!isRefresh) {
         playSoundNotification();
     }
+}
+
+// get all order numbers from auction items
+function getOrderNumbers() {
+    const auctionItems = target?.querySelectorAll('.messages__left_item[data-stage="Auction"]') || [];
+    const orderNumbers = new Set();
+
+    auctionItems.forEach(item => {
+        const orderId = item.getAttribute("data-id");
+        if(orderId) {
+            orderNumbers.add(orderId);
+        }
+    });
+
+    return orderNumbers;
+}
+
+// Get online users from all items
+function getOnlineUsers() {
+    const allItems = target?.querySelectorAll('.messages__left_item') || [];
+    const onlineUsers = new Set();
+
+    allItems.forEach(item => {
+        const onlineStatus = item.getAttribute('data-online');
+        const customerNick = item.getAttribute('data-cutomer_nick_name');
+        const orderId = item.getAttribute('data-id')
+        
+        if(onlineStatus === 'online' && customerNick && orderId) {
+            onlineUsers.add(`${customerNick}|${orderId}`);
+        }
+    });
+
+    return onlineUsers;
+}
+
+// compare orders and detect changes
+function checkForNewOrders() {
+    const currentOrderNumbers = getOrderNumbers();
+    const newOrders = [...currentOrderNumbers].filter(
+        orderId => !lastKnownOrderNumbers.has(orderId)
+    );
+
+    if(newOrders.length > 0) {
+        // get new order details
+        const newOrderDetails = [];
+        newOrders.forEach(orderId => {
+            const item = target?.querySelector(`.messages__left_item[data-id="${orderId}"]`);
+            if (item) {
+                const title = item.getAttribute('data-title') || 'Unknown';
+                const customerNick = item.getAttribute('data-cutomer_nick_name') || 'Unknown';
+                newOrderDetails.push({ orderId, title, customerNick });
+            }
+        })
+
+        let notificationText = `🔥 ${newOrders.length} NEW AUCTION${newOrders.length > 1 ? 'S' : ''}!`;
+        if (newOrderDetails.length > 0) {
+            const firstOrder = newOrderDetails[0];
+            notificationText += ` #${firstOrder.orderId} "${firstOrder.title}" from ${firstOrder.customerNick}`;
+            if (newOrders.length > 1) {
+                notificationText += ` (+${newOrders.length - 1} more)`;
+            }
+        }
+        
+        notifyChange(notificationText);
+    }
+    
+    lastKnownOrderNumbers = currentOrderNumbers;
+    return newOrders.length > 0;
+}
+
+// New: Check for users coming online
+function checkForNewOnlineUsers() {
+    const currentOnlineUsers = getOnlineUsers();
+    const newOnlineUsers = [...currentOnlineUsers].filter(userOrder => !lastKnownOnlineUsers.has(userOrder));
+    
+    if (newOnlineUsers.length > 0) {
+        newOnlineUsers.forEach(userOrder => {
+            const [customerNick, orderId] = userOrder.split('|');
+            const item = target?.querySelector(`.messages__left_item[data-id="${orderId}"]`);
+            const title = item?.getAttribute('data-title') || 'Unknown Order';
+            
+            notifyChange(`🟢 CUSTOMER ONLINE: ${customerNick} (#${orderId} - "${title}") - Engage now!`);
+        });
+    }
+    
+    lastKnownOnlineUsers = currentOnlineUsers;
+    return newOnlineUsers.length > 0;
 }
 
 function getMessageCounts() {
@@ -139,71 +230,91 @@ function getOrderDetails(item) {
     };
 }
 
-// Detect if user is typing in input fields
-function setupTypingDetection() {
-    const inputSelectors = 'input[type="text"], textarea, [contenteditable="true"]';
+function storeCurrentState() {
+    const orderNumbers = Array.from(getOrderNumbers());
+    const onlineUsers = Array.from(getOnlineUsers());
+    const counts = getMessageCounts();
+    const content = target?.innerText || '';
     
-    document.addEventListener('input', (e) => {
-        if (e.target.matches(inputSelectors)) {
-            isTyping = true;
-            clearTimeout(typingTimeout);
-            typingTimeout = setTimeout(() => {
-                isTyping = false;
-            }, 2000); // Consider typing stopped after 2 seconds of no input
-        }
-    });
-    
-    document.addEventListener('keydown', (e) => {
-        if (e.target.matches(inputSelectors)) {
-            isTyping = true;
-            clearTimeout(typingTimeout);
-            typingTimeout = setTimeout(() => {
-                isTyping = false;
-            }, 2000);
-        }
-    });
+    sessionStorage.setItem('preRefreshOrderNumbers', JSON.stringify(orderNumbers));
+    sessionStorage.setItem('preRefreshOnlineUsers', JSON.stringify(onlineUsers));
+    sessionStorage.setItem('preRefreshCounts', JSON.stringify(counts));
+    sessionStorage.setItem('preRefreshContent', content);
 }
 
 // Monitor for page refreshes/reloads
 function setupRefreshDetection() {
-    // Detect when the page is about to refresh
-    window.addEventListener('beforeunload', () => {
-        // Store current state before refresh
-        const counts = getMessageCounts();
-        sessionStorage.setItem('preRefreshCounts', JSON.stringify(counts));
-        sessionStorage.setItem('preRefreshContent', target?.innerText || '');
-    });
+    //store current state before refresh
+    window.addEventListener('beforeunload', storeCurrentState)
+
+    //check after page loads
+    window.addEventListener('load', checkPostRefreshChanges)
+}
+
+// Enhanced: Check for changes after refresh
+function checkPostRefreshChanges() {
+    const preRefreshOrderNumbers = new Set(JSON.parse(sessionStorage.getItem('preRefreshOrderNumbers') || '[]'));
+    const preRefreshOnlineUsers = new Set(JSON.parse(sessionStorage.getItem('preRefreshOnlineUsers') || '[]'));
+    const preRefreshCounts = JSON.parse(sessionStorage.getItem('preRefreshCounts') || '{"auction":0}');
+    const preRefreshContent = sessionStorage.getItem('preRefreshContent') || '';
     
-    // Check after page loads if it was refreshed
-    window.addEventListener('load', () => {
-        const preRefreshCounts = JSON.parse(sessionStorage.getItem('preRefreshCounts') || '{"auction":0}');
-        const preRefreshContent = sessionStorage.getItem('preRefreshContent') || '';
+    if (preRefreshOrderNumbers.size > 0 || preRefreshOnlineUsers.size > 0 || preRefreshCounts.auction > 0 || preRefreshContent) {
         
-        if (preRefreshCounts.auction > 0 || preRefreshContent) {
-            notifyChange("Page refreshed - checking for new content", true);
+        // Clear the stored data
+        sessionStorage.removeItem('preRefreshOrderNumbers');
+        sessionStorage.removeItem('preRefreshOnlineUsers');
+        sessionStorage.removeItem('preRefreshCounts');
+        sessionStorage.removeItem('preRefreshContent');
+        
+        // Wait for page to fully load, then check for changes
+        setTimeout(() => {
+            const currentOrderNumbers = getOrderNumbers();
+            const currentOnlineUsers = getOnlineUsers();
+            const currentCounts = getMessageCounts();
+            const currentContent = target?.innerText || '';
             
-            // Clear the stored data
-            sessionStorage.removeItem('preRefreshCounts');
-            sessionStorage.removeItem('preRefreshContent');
+            // Check for new orders
+            const newOrders = [...currentOrderNumbers].filter(orderId => !preRefreshOrderNumbers.has(orderId));
             
-            // Wait a bit for the page to fully load, then check for new content
-            setTimeout(() => {
-                const currentCounts = getMessageCounts();
-                const currentContent = target?.innerText || '';
+            // Check for new online users
+            const newOnlineUsers = [...currentOnlineUsers].filter(userOrder => !preRefreshOnlineUsers.has(userOrder));
+            
+            if (newOrders.length > 0) {
+                let notificationText = `🔥 ${newOrders.length} NEW AUCTION${newOrders.length > 1 ? 'S' : ''} after refresh!`;
                 
-                if (currentCounts.auction > preRefreshCounts.auction || 
-                    (currentContent !== preRefreshContent && currentContent.length > preRefreshContent.length)) {
-                    
-                    let changeText = "New auction content detected after refresh!";
-                    if (currentCounts.auction > preRefreshCounts.auction) {
-                        changeText = `🔥 ${currentCounts.auction - preRefreshCounts.auction} NEW AUCTION${currentCounts.auction - preRefreshCounts.auction > 1 ? 'S' : ''} detected after refresh!`;
+                // Get details for the first new order
+                const firstOrderId = newOrders[0];
+                const item = target?.querySelector(`.messages__left_item[data-id="${firstOrderId}"]`);
+                if (item) {
+                    const title = item.getAttribute('data-title') || 'Unknown';
+                    const customerNick = item.getAttribute('data-cutomer_nick_name') || 'Unknown';
+                    notificationText += ` #${firstOrderId} "${title}" from ${customerNick}`;
+                    if (newOrders.length > 1) {
+                        notificationText += ` (+${newOrders.length - 1} more)`;
                     }
-                    
-                    notifyChange(changeText);
                 }
-            }, 1000);
-        }
-    });
+                
+                notifyChange(notificationText);
+            }
+            
+            if (newOnlineUsers.length > 0) {
+                newOnlineUsers.forEach(userOrder => {
+                    const [customerNick, orderId] = userOrder.split('|');
+                    const item = target?.querySelector(`.messages__left_item[data-id="${orderId}"]`);
+                    const title = item?.getAttribute('data-title') || 'Unknown Order';
+                    
+                    notifyChange(`🟢 CUSTOMER CAME ONLINE: ${customerNick} (#${orderId} - "${title}") - Engage now!`);
+                });
+            }
+            
+            // Update our tracking with current state
+            lastKnownOrderNumbers = currentOrderNumbers;
+            lastKnownOnlineUsers = currentOnlineUsers;
+            lastKnownCounts = { auction: currentCounts.auction };
+            lastFullContent = currentContent;
+            
+        }, 1000);
+    }
 }
 
 if(target) {
@@ -217,8 +328,9 @@ if(target) {
     };
     lastFullContent = target.innerText;
     
-    // Setup typing detection
-    setupTypingDetection();
+    // New: Initialize order number and online user tracking
+    lastKnownOrderNumbers = getOrderNumbers();
+    lastKnownOnlineUsers = getOnlineUsers();
     
     // Setup refresh detection
     setupRefreshDetection();
@@ -234,6 +346,16 @@ if(target) {
             return;
         }
         
+        // Primary checks: New orders and online users
+        const hasNewOrders = checkForNewOrders();
+        const hasNewOnlineUsers = checkForNewOnlineUsers();
+
+        // If we detected changes through order number tracking, skip other checks
+        if (hasNewOrders || hasNewOnlineUsers) {
+            return;
+        }
+
+        //Fallback checks
         const currentCounts = getMessageCounts();
         const currentContent = target.innerText;
         const unreadCount = getUnreadCounts();
@@ -269,6 +391,12 @@ if(target) {
         attributes: true // Now we want to monitor data-stage changes
     });
     
+    // New: Periodic check for online status changes (every 30 seconds)
+    setInterval(() => {
+        if (isExtensionValid()) {
+            checkForNewOnlineUsers();
+        }
+    }, 30000);
 } else {
     console.warn(`Target ${targetSelector} not found`);
 }
