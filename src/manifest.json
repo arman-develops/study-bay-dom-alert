@@ -18,9 +18,12 @@
             "matches": ["<all_urls>"]
         }
     ],
-    "host_permissions": ["https://studybay.com/*"],
+    "host_permissions": [
+        "https://studybay.com/*",
+        "https://api.telegram.org/*"
+    ],
     "background": {
-        "service_worker": "background.js"
+        "service_worker": "telegram.js"
     },
     "content_scripts": [
         {
