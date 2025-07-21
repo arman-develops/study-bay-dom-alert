@@ -1,6 +1,6 @@
 // Telegram bot configuration
-const TELEGRAM_BOT_TOKEN = '8090966255:AAECBcIIdWEo55AbGvNnrqf-jZnRa9yGvzM';
-const TELEGRAM_CHAT_ID = '5162030633';
+const TELEGRAM_BOT_TOKEN = ''; //add your bot token here
+const TELEGRAM_CHAT_ID = ''; //add your tg id here
 
 // Function to format message for Telegram
 function formatTelegramMessage(message) {
