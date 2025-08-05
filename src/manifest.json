@@ -1,37 +1,33 @@
 {
-    "manifest_version": 3,
-    "name": "DOM Alert Extension",
-    "version": "1.0.0",
-    "description": "Notifies when a specific DOM element changes on the target website",
-    "permissions": [
-        "notifications", 
-        "scripting",
-        "storage"
-    ],
-    "web_accessible_resources": [
-        {
-            "resources": ["sound-notification.mp3"],
-            "matches": ["<all_urls>"]
-        },
-        {
-            "resources": ["icon.png"],
-            "matches": ["<all_urls>"]
-        }
-    ],
-    "host_permissions": [
-        "https://studybay.com/*",
-        "https://api.telegram.org/*"
-    ],
-    "background": {
-        "service_worker": "telegram.js"
-    },
-    "content_scripts": [
-        {
-            "matches": ["https://studybay.com/home/*"],
-            "js": ["content.js"]
-        }
-    ],
-    "action": {
-        "default_title": "DOM Watcher Active"
+  "manifest_version": 3,
+  "name": "Enhanced Bidding Extension",
+  "version": "1.0",
+  "description": "Track auctions and orders with notifications",
+  
+  "permissions": [
+    "notifications",
+    "storage",
+    "activeTab"
+  ],
+  
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+        "js": [
+            "content.js"
+        ],
+      "type": "module"
     }
+  ],
+  
+  "background": {
+    "service_worker": "study-bay-alert.js"
+  },
+  
+  "web_accessible_resources": [
+    {
+      "resources": ["sound-notification.mp3", "sound-notification.wav"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }
